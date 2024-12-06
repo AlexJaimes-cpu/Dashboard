@@ -43,20 +43,6 @@ st.markdown("""
             color: #0056a6;
             margin: 0;
         }
-        .green-cell {
-            background-color: #C8E6C9;
-        }
-        .blue-cell {
-            background-color: #BBDEFB;
-        }
-        .grey-cell {
-            background-color: #E0E0E0;
-        }
-        .delete-cell {
-            color: red;
-            font-weight: bold;
-            cursor: pointer;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -85,6 +71,20 @@ try:
     # Asignar nombres clave a las columnas
     puntos_venta = ["market samaria", "market playa dormida", "market two towers"]
 
+    # Filtros acumulativos
+    st.sidebar.header("Filtros")
+    categorias = datos["categoria"].dropna().unique().tolist() if "categoria" in datos.columns else []
+    marcas = datos["marca"].dropna().unique().tolist() if "marca" in datos.columns else []
+
+    filtro_categoria = st.sidebar.multiselect("Filtrar por Categoría", categorias)
+    filtro_marca = st.sidebar.multiselect("Filtrar por Marca", marcas)
+
+    datos_filtrados = datos.copy()
+    if filtro_categoria:
+        datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
+    if filtro_marca:
+        datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
+
     # Calcular totales generales por punto de venta
     st.title("Dashboard de Ventas")
     st.subheader("Totales Generales por Punto de Venta")
@@ -92,9 +92,11 @@ try:
 
     for i, punto in enumerate(puntos_venta):
         vendido_col = f"{punto} vendido"
-        if vendido_col in datos.columns:
-            total_venta = datos[vendido_col].sum()
-            total_costo = datos[vendido_col].sum() * (datos["costo"].sum() / datos["total neto"].sum())
+        inventario_col = f"{punto} inventario"
+        if vendido_col in datos_filtrados.columns:
+            total_venta = datos_filtrados[vendido_col].sum()
+            total_inventario = datos_filtrados[inventario_col].sum()
+            total_costo = total_venta * (datos_filtrados["costo"].sum() / datos_filtrados["total neto"].sum())
             ganancia = total_venta - total_costo
             margen = (ganancia / total_venta) * 100 if total_venta > 0 else 0
 
@@ -103,6 +105,7 @@ try:
                 <div class="custom-box">
                     <h3>{punto.title()}</h3>
                     <p>Total Ventas: ${total_venta:,.2f}</p>
+                    <p>Total Inventario: ${total_inventario:,.2f}</p>
                     <p>Total Costo: ${total_costo:,.2f}</p>
                     <p>Ganancia: ${ganancia:,.2f}</p>
                     <p>Margen: {margen:.2f}%</p>
@@ -112,7 +115,7 @@ try:
     # Gráficas de pastel
     st.subheader("Gráficas de Productos Más Vendidos")
     col1, col2 = st.columns(2)
-    productos_mas_vendidos = datos.groupby("nombre")["total neto"].sum().nlargest(5)
+    productos_mas_vendidos = datos_filtrados.groupby("nombre")["total neto"].sum().nlargest(5)
 
     with col1:
         st.markdown("### Top 5 Productos Más Vendidos (Totales)")
@@ -123,7 +126,7 @@ try:
 
     with col2:
         for punto in puntos_venta:
-            top_punto = datos.groupby("nombre")[f"{punto} vendido"].sum().nlargest(5)
+            top_punto = datos_filtrados.groupby("nombre")[f"{punto} vendido"].sum().nlargest(5)
             st.markdown(f"### Top 5 en {punto.title()}")
             fig, ax = plt.subplots()
             top_punto.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
@@ -138,21 +141,20 @@ try:
     if punto_seleccionado:
         vendido_col = f"{punto_seleccionado} vendido"
         inventario_col = f"{punto_seleccionado} inventario"
-        datos["orden"] = (datos[vendido_col] - datos[inventario_col]).clip(lower=0)
+        datos_filtrados["orden"] = (datos_filtrados[vendido_col] - datos_filtrados[inventario_col]).clip(lower=0)
 
         # Crear tabla editable
-        datos["Inventario"] = datos[inventario_col]
-        tabla = datos[["nombre", inventario_col, vendido_col, "orden"]]
+        tabla = datos_filtrados[["nombre", inventario_col, vendido_col, "orden"]]
         tabla.rename(columns={inventario_col: "Inventario", vendido_col: "Vendido", "orden": "Orden"}, inplace=True)
 
         st.markdown("### Tabla de Órdenes (Editable)")
-        edited_table = st.experimental_data_editor(tabla, use_container_width=True)
+        edited_table = st.dataframe(tabla)
 
         # Botón para exportar a PDF
         if st.button("Exportar a PDF"):
             pdf_buffer = BytesIO()
             with PdfPages(pdf_buffer) as pdf:
-                for index, row in edited_table.iterrows():
+                for index, row in tabla.iterrows():
                     fig, ax = plt.subplots()
                     ax.text(0.5, 0.5, f"{row['nombre']}: {row['Orden']}", fontsize=12, ha='center')
                     pdf.savefig(fig)
