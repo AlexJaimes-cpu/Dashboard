@@ -97,26 +97,35 @@ try:
             </div>
         """, unsafe_allow_html=True)
 
-   # Totales por punto de venta
-st.subheader("Totales por Punto de Venta")
-for punto in puntos_venta:
-    vendido_col = f"{punto} vendido"
-    if vendido_col in datos.columns:
-        total_venta_punto = datos[vendido_col].sum()  # Calcula el total vendido para el punto de venta
-        total_costo_punto = datos[vendido_col].sum() * (total_costo / total_ventas) if total_ventas != 0 else 0
-        ganancia_punto = total_venta_punto - total_costo_punto
-        margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto != 0 else 0
-        
-        st.markdown(f"""
-            <div class="custom-box">
-                <h3>{punto.title()}</h3>
-                <p>Total Ventas: ${total_venta_punto:,.2f}</p>
-                <p>Total Costo: ${total_costo_punto:,.2f}</p>
-                <p>Ganancia: ${ganancia_punto:,.2f}</p>
-                <p>Margen: {margen_punto:.2f}%</p>
-            </div>
-        """, unsafe_allow_html=True)
+    # Totales por punto de venta (cálculo corregido)
+    st.subheader("Totales por Punto de Venta")
+    cols = st.columns(len(puntos_venta))  # Crear columnas para mostrar los totales de cada punto de venta
 
+    suma_puntos_venta = 0
+    for i, punto in enumerate(puntos_venta):
+        vendido_col = f"{punto} vendido"
+        if vendido_col in datos.columns:
+            total_venta_punto = datos[vendido_col].sum()  # Sumar correctamente las ventas por punto de venta
+            suma_puntos_venta += total_venta_punto  # Acumular para verificar con total neto
+
+            total_costo_punto = total_venta_punto * (total_costo / total_ventas) if total_ventas > 0 else 0
+            ganancia_punto = total_venta_punto - total_costo_punto
+            margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto > 0 else 0
+
+            with cols[i]:
+                st.markdown(f"""
+                    <div class="custom-box">
+                        <h3>{punto.title()}</h3>
+                        <p>Total Ventas: ${total_venta_punto:,.2f}</p>
+                        <p>Total Costo: ${total_costo_punto:,.2f}</p>
+                        <p>Ganancia: ${ganancia_punto:,.2f}</p>
+                        <p>Margen: {margen_punto:.2f}%</p>
+                    </div>
+                """, unsafe_allow_html=True)
+
+    # Verificar si las ventas totales por punto de venta coinciden con el total neto
+    if abs(suma_puntos_venta - total_ventas) > 1e-2:  # Permitir un margen mínimo de error
+        st.error(f"ERROR: Las ventas totales por punto de venta (${suma_puntos_venta:,.2f}) no coinciden con el total neto (${total_ventas:,.2f}).")
 
     # Filtros acumulativos
     st.sidebar.header("Filtros")
@@ -173,24 +182,6 @@ for punto in puntos_venta:
         top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
         ax.set_ylabel("")
         st.pyplot(fig)
-
-  # Generador de Órdenes
-st.subheader("Generador de Órdenes")
-punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
-dias = st.number_input("Ingrese el número de días de ventas que desea calcular", min_value=1, max_value=30, value=7)
-
-if punto_seleccionado:
-    vendido_col = f"{punto_seleccionado} vendido"
-    if vendido_col in datos.columns:
-        datos["unidades_diarias"] = datos[vendido_col] / 30  # Unidades promedio por día
-        datos["proyeccion_unidades"] = datos["unidades_diarias"] * dias
-
-        # Mostrar tabla de proyección
-        st.dataframe(datos[["nombre", vendido_col, "proyeccion_unidades"]])
-
-# Bloque `except` para capturar errores
-except Exception as e:
-    st.error(f"Error al procesar el archivo: {e}")
 
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}")
