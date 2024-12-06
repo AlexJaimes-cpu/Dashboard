@@ -97,19 +97,16 @@ try:
             </div>
         """, unsafe_allow_html=True)
 
-   # Totales por punto de venta (revisión de cálculo)
-st.subheader("Totales por Punto de Venta")
-cols = st.columns(len(puntos_venta))  # Crear una columna para cada punto de venta
-
-for i, punto in enumerate(puntos_venta):
-    vendido_col = f"{punto} vendido"  # Columna de ventas específicas del punto de venta
-    if vendido_col in datos.columns:
-        total_venta_punto = datos[vendido_col].sum()  # Calcular las ventas totales para el punto
-        total_costo_punto = datos[vendido_col].sum() * (total_costo / total_ventas) if total_ventas > 0 else 0
-        ganancia_punto = total_venta_punto - total_costo_punto
-        margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto > 0 else 0
-
-        with cols[i]:
+    # Totales por punto de venta
+    st.subheader("Totales por Punto de Venta")
+    for punto in puntos_venta:
+        vendido_col = f"{punto} vendido"
+        if vendido_col in datos.columns:
+            total_venta_punto = datos[vendido_col].sum()  # Calcula el total vendido para el punto de venta
+            total_costo_punto = datos[vendido_col].sum() * (total_costo / total_ventas) if total_ventas != 0 else 0
+            ganancia_punto = total_venta_punto - total_costo_punto
+            margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto != 0 else 0
+            
             st.markdown(f"""
                 <div class="custom-box">
                     <h3>{punto.title()}</h3>
