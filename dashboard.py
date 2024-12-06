@@ -125,16 +125,58 @@ try:
                 </div>
             """, unsafe_allow_html=True)
 
-    # Gráficos
-    st.subheader("Gráficos de Productos Más Vendidos")
-    productos_mas_vendidos = datos.groupby("nombre")["total vendido"].sum().nlargest(5)
+    # Filtros acumulativos
+    st.sidebar.header("Filtros")
+    categorias = datos["categoria"].dropna().unique().tolist() if "categoria" in datos.columns else []
+    marcas = datos["marca"].dropna().unique().tolist() if "marca" in datos.columns else []
+    nombres = datos["nombre"].dropna().unique().tolist() if "nombre" in datos.columns else []
 
-    st.markdown("#### Top 5 Productos Más Vendidos")
-    fig, ax = plt.subplots()
-    productos_mas_vendidos.plot(kind="bar", ax=ax)
-    ax.set_ylabel("Unidades Vendidas")
-    ax.set_title("Top 5 Productos Más Vendidos")
-    st.pyplot(fig)
+    filtro_categoria = st.sidebar.multiselect("Filtrar por Categoría", categorias, key="filtro_categoria")
+    filtro_marca = st.sidebar.multiselect("Filtrar por Marca", marcas, key="filtro_marca")
+    filtro_nombre = st.sidebar.multiselect("Filtrar por Producto (Nombre)", nombres, key="filtro_nombre")
+
+    datos_filtrados = datos.copy()
+    if filtro_categoria:
+        datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
+    if filtro_marca:
+        datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
+    if filtro_nombre:
+        datos_filtrados = datos_filtrados[datos_filtrados["nombre"].isin(filtro_nombre)]
+
+    # Tablas interactivas por punto de venta
+    st.subheader("Tablas Interactivas por Punto de Venta")
+    for punto in puntos_venta:
+        st.markdown(f'<div class="custom-box"><h3>{punto.title()}</h3>', unsafe_allow_html=True)
+        vendido_col = f"{punto} vendido"
+        if vendido_col in datos_filtrados.columns:
+            tabla = datos_filtrados.groupby("nombre").agg(
+                Unidades_Vendidas=(vendido_col, "sum"),
+                Total_Ventas=(f"{punto}_ventas_calculadas", "sum"),
+                Ganancia=(f"{punto}_ganancia_calculada", "sum"),
+            ).reset_index().sort_values("Unidades_Vendidas", ascending=False)
+            st.dataframe(tabla)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Gráficas (dos por fila, responsive)
+    st.subheader("Gráficos de Productos Más Vendidos")
+    productos_mas_vendidos = datos_filtrados.groupby("nombre")["total vendido"].sum().nlargest(5)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("#### Top 5 Productos Más Vendidos (Totales)")
+        fig, ax = plt.subplots()
+        productos_mas_vendidos.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+        ax.set_ylabel("")
+        st.pyplot(fig)
+
+    with col2:
+        for punto in puntos_venta:
+            st.markdown(f"#### Top 5 en {punto.title()}")
+            fig, ax = plt.subplots()
+            top_punto_venta = datos_filtrados.groupby("nombre")[f"{punto} vendido"].sum().nlargest(5)
+            top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+            ax.set_ylabel("")
+            st.pyplot(fig)
 
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}")
