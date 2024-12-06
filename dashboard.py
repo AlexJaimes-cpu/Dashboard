@@ -42,20 +42,6 @@ st.markdown("""
             color: #0056a6;
             margin: 0;
         }
-        .edit-cell {
-            background-color: #F0F8FF;
-            border: 1px solid #d3d3d3;
-            border-radius: 4px;
-        }
-        .green-cell {
-            background-color: #C8E6C9;
-        }
-        .blue-cell {
-            background-color: #BBDEFB;
-        }
-        .grey-cell {
-            background-color: #E0E0E0;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -84,57 +70,85 @@ try:
     # Asignar nombres clave a las columnas
     puntos_venta = ["market samaria", "market playa dormida", "market two towers"]
 
-    # **Inicio del generador de órdenes**
-    st.subheader("Generador de Órdenes")
-    punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
-    dias = st.number_input("Ingrese el número de días de ventas que desea calcular", min_value=1, max_value=30, value=7)
+    # Calcular totales generales
+    total_ventas = datos["total neto"].sum()
+    total_costo = datos["costo"].sum()
+    total_ganancia = total_ventas - total_costo
+    porcentaje_ganancia = (total_ganancia / total_ventas) * 100 if total_ventas != 0 else 0
 
-    if punto_seleccionado:
-        vendido_col = f"{punto_seleccionado} vendido"
-        inventario_col = f"{punto_seleccionado} inventario"
+    # Mostrar resultados generales
+    st.title("Dashboard de Ventas")
+    col1, col2 = st.columns(2)
 
-        if vendido_col in datos.columns and inventario_col in datos.columns:
-            datos["unidades_diarias"] = datos[vendido_col] / 30  # Unidades promedio por día
-            datos["proyeccion_unidades"] = datos["unidades_diarias"] * dias
-            datos["orden"] = (datos[vendido_col] - datos[inventario_col]).clip(lower=0)
-            
-            # Aplicar formato de colores a la columna "orden"
-            def color_celda(valor):
-                if valor > 0:
-                    return "green-cell"
-                elif valor == 0:
-                    return "blue-cell"
-                else:
-                    return "grey-cell"
+    with col1:
+        st.markdown(f"""
+            <div class="custom-box">
+                <h3>Total Ventas</h3>
+                <p>${total_ventas:,.2f}</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-            # Mostrar tabla interactiva con filtros acumulativos
-            categorias = datos["categoria"].dropna().unique().tolist()
-            marcas = datos["marca"].dropna().unique().tolist()
+    with col2:
+        st.markdown(f"""
+            <div class="custom-box">
+                <h3>Totales de Ganancia</h3>
+                <p>Total Costo: ${total_costo:,.2f}</p>
+                <p>Total Ganancia: ${total_ganancia:,.2f}</p>
+                <p>Porcentaje Ganancia: {porcentaje_ganancia:.2f}%</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-            filtro_categoria = st.sidebar.multiselect("Filtrar por Categoría", categorias, key="filtro_categoria")
-            filtro_marca = st.sidebar.multiselect("Filtrar por Marca", marcas, key="filtro_marca")
+    # Totales por punto de venta (en una sola fila)
+    st.subheader("Totales por Punto de Venta")
+    for punto in puntos_venta:
+        vendido_col = f"{punto} vendido"
+        if vendido_col in datos.columns:
+            total_venta_punto = datos[vendido_col].sum()
+            total_costo_punto = total_venta_punto * (total_costo / total_ventas) if total_ventas != 0 else 0
+            ganancia_punto = total_venta_punto - total_costo_punto
+            margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto != 0 else 0
 
-            datos_filtrados = datos.copy()
-            if filtro_categoria:
-                datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
-            if filtro_marca:
-                datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
+            st.markdown(f"""
+                <div class="custom-box">
+                    <h3>{punto.title()}</h3>
+                    <p>Total Ventas: ${total_venta_punto:,.2f}</p>
+                    <p>Total Costo: ${total_costo_punto:,.2f}</p>
+                    <p>Ganancia: ${ganancia_punto:,.2f}</p>
+                    <p>Margen: {margen_punto:.2f}%</p>
+                </div>
+            """, unsafe_allow_html=True)
 
-            # Mostrar tabla editable
-            st.markdown("### Tabla de Generador de Órdenes")
-            edited_table = datos_filtrados[["nombre", inventario_col, "orden"]]
-            edited_table = edited_table.rename(columns={inventario_col: "Inventario"})
-            edited_table["Orden"] = edited_table["orden"]
+    # Tablas interactivas por punto de venta
+    st.subheader("Tablas Interactivas por Punto de Venta")
+    for punto in puntos_venta:
+        st.markdown(f'<div class="custom-box"><h3>{punto.title()}</h3>', unsafe_allow_html=True)
+        vendido_col = f"{punto} vendido"
+        if vendido_col in datos.columns:
+            tabla = datos.groupby("nombre").agg(
+                Unidades_Vendidas=(vendido_col, "sum"),
+                Total_Ventas=("total neto", "sum"),
+                Ganancia=("ganancia", "sum"),
+            ).reset_index().sort_values("Unidades_Vendidas", ascending=False)
+            st.dataframe(tabla)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            st.dataframe(edited_table)
+    # Gráficos de pastel
+    st.subheader("Gráficos de Productos Más Vendidos")
+    productos_mas_vendidos = datos.groupby("nombre")["total neto"].sum().nlargest(5)
 
-            # Exportar a PDF
-            if st.button("Exportar a PDF"):
-                pdf_name = f"{punto_seleccionado}_ordenes_{datetime.date.today()}.pdf"
-                with PdfPages(pdf_name) as pdf:
-                    for index, row in edited_table.iterrows():
-                        pdf.savefig(row.to_dict())
-                st.success(f"PDF Exportado como: {pdf_name}")
+    st.markdown("#### Top 5 Productos Más Vendidos (Totales)")
+    fig, ax = plt.subplots()
+    productos_mas_vendidos.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+    ax.set_ylabel("")
+    st.pyplot(fig)
+
+    for punto in puntos_venta:
+        st.markdown(f"#### Top 5 Productos Más Vendidos en {punto.title()}")
+        top_punto_venta = datos.groupby("nombre")[f"{punto} vendido"].sum().nlargest(5)
+        fig, ax = plt.subplots()
+        top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+        ax.set_ylabel("")
+        st.pyplot(fig)
 
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}")
