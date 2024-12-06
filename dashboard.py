@@ -172,20 +172,5 @@ try:
         top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
         ax.set_ylabel("")
         st.pyplot(fig)
-
-    # Generador de Órdenes
-    st.subheader("Generador de Órdenes")
-    punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
-    dias = st.number_input("Ingrese el número de días de ventas que desea calcular", min_value=1, max_value=30, value=7)
-
-    if punto_seleccionado:
-        vendido_col = f"{punto_seleccionado} vendido"
-        if vendido_col in datos.columns:
-            datos["unidades_diarias"] = datos[vendido_col] / 30  # Unidades promedio por día
-            datos["proyeccion_unidades"] = datos["unidades_diarias"] * dias
-
-            # Mostrar tabla de proyección
-            st.dataframe(datos[["nombre", vendido_col, "proyeccion_unidades"]])
-
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}")
