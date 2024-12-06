@@ -69,12 +69,65 @@ try:
     # Asignar nombres clave a las columnas
     puntos_venta = ["market samaria", "market playa dormida", "market two towers"]
 
-    # Calcular totales generales
-    total_ventas = datos["total neto"].sum()
-    total_costo = datos["costo"].sum()
-    total_ganancia = total_ventas - total_costo
-    porcentaje_ganancia = (total_ganancia / total_ventas) * 100 if total_ventas != 0 else 0
-
     # Mostrar resultados generales
     st.title("Dashboard de Ventas")
-    col1, col2 = st.columns(2
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(f"""
+            <div class="custom-box">
+                <h3>Total Ventas</h3>
+                <p>${datos["total neto"].sum():,.2f}</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        total_costo = datos["costo"].sum()
+        total_ganancia = datos["total neto"].sum() - total_costo
+        porcentaje_ganancia = (total_ganancia / datos["total neto"].sum()) * 100 if datos["total neto"].sum() != 0 else 0
+        st.markdown(f"""
+            <div class="custom-box">
+                <h3>Totales de Ganancia</h3>
+                <p>Total Costo: ${total_costo:,.2f}</p>
+                <p>Total Ganancia: ${total_ganancia:,.2f}</p>
+                <p>Porcentaje Ganancia: {porcentaje_ganancia:.2f}%</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Totales por punto de venta (en una sola fila)
+    st.subheader("Totales por Punto de Venta")
+    cols = st.columns(len(puntos_venta))
+    for i, punto in enumerate(puntos_venta):
+        vendido_col = f"{punto} vendido"
+        if vendido_col in datos.columns:
+            with cols[i]:
+                st.markdown(f"""
+                    <div class="custom-box">
+                        <h3>{punto.title()}</h3>
+                        <p>Total Ventas: ${datos[vendido_col].sum():,.2f}</p>
+                    </div>
+                """, unsafe_allow_html=True)
+
+    # Gráficas de pastel (2 por fila)
+    st.subheader("Gráficos de Productos Más Vendidos")
+    col1, col2 = st.columns(2)
+    productos_mas_vendidos = datos.groupby("nombre")["total neto"].sum().nlargest(5)
+
+    with col1:
+        st.markdown("### Top 5 Productos Más Vendidos (Totales)")
+        fig, ax = plt.subplots()
+        productos_mas_vendidos.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+        ax.set_ylabel("")
+        st.pyplot(fig)
+
+    with col2:
+        for punto in puntos_venta:
+            st.markdown(f"### Top 5 en {punto.title()}")
+            fig, ax = plt.subplots()
+            top_punto_venta = datos.groupby("nombre")[f"{punto} vendido"].sum().nlargest(5)
+            top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+            ax.set_ylabel("")
+            st.pyplot(fig)
+
+except Exception as e:
+    st.error(f"Error al procesar el archivo: {e}")
