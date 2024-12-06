@@ -48,8 +48,9 @@ st.markdown("""
 current_dir = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(current_dir, 'Reporte_Corregido.xlsx')
 
+# Leer el archivo y procesar los datos
 try:
-    # Leer el archivo y procesar los datos
+    # Cargar datos desde la hoja "Sheet1"
     datos = pd.read_excel(file_path, sheet_name="Sheet1")
 
     # Normalizar los nombres de las columnas
@@ -96,36 +97,95 @@ try:
             </div>
         """, unsafe_allow_html=True)
 
-    # Totales por punto de venta (cálculo corregido)
+    # Totales por punto de venta
     st.subheader("Totales por Punto de Venta")
-    cols = st.columns(len(puntos_venta))  # Crear columnas para mostrar los totales de cada punto de venta
-
-    suma_puntos_venta = 0
-    for i, punto in enumerate(puntos_venta):
+    for punto in puntos_venta:
         vendido_col = f"{punto} vendido"
         if vendido_col in datos.columns:
-            total_venta_punto = datos[vendido_col].sum()  # Sumar correctamente las ventas por punto de venta
-            suma_puntos_venta += total_venta_punto
-
-            total_costo_punto = total_venta_punto * (total_costo / total_ventas) if total_ventas > 0 else 0
+            total_venta_punto = datos[vendido_col].sum()  # Calcula el total vendido para el punto de venta
+            total_costo_punto = datos[vendido_col].sum() * (total_costo / total_ventas) if total_ventas != 0 else 0
             ganancia_punto = total_venta_punto - total_costo_punto
-            margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto > 0 else 0
+            margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto != 0 else 0
+            
+            st.markdown(f"""
+                <div class="custom-box">
+                    <h3>{punto.title()}</h3>
+                    <p>Total Ventas: ${total_venta_punto:,.2f}</p>
+                    <p>Total Costo: ${total_costo_punto:,.2f}</p>
+                    <p>Ganancia: ${ganancia_punto:,.2f}</p>
+                    <p>Margen: {margen_punto:.2f}%</p>
+                </div>
+            """, unsafe_allow_html=True)
 
-            with cols[i]:
-                st.markdown(f"""
-                    <div class="custom-box">
-                        <h3>{punto.title()}</h3>
-                        <p>Total Ventas: ${total_venta_punto:,.2f}</p>
-                        <p>Total Costo: ${total_costo_punto:,.2f}</p>
-                        <p>Ganancia: ${ganancia_punto:,.2f}</p>
-                        <p>Margen: {margen_punto:.2f}%</p>
-                    </div>
-                """, unsafe_allow_html=True)
+    # Filtros acumulativos
+    st.sidebar.header("Filtros")
+    categorias = datos["categoria"].dropna().unique().tolist()
+    marcas = datos["marca"].dropna().unique().tolist()
+    nombres = datos["nombre"].dropna().unique().tolist()
 
-    # Verificar si las ventas totales por punto de venta coinciden con el total neto
-    if abs(suma_puntos_venta - total_ventas) > 1e-2:  # Permitir un margen mínimo de error
-        st.error(f"ERROR: Las ventas totales por punto de venta (${suma_puntos_venta:,.2f}) no coinciden con el total neto (${total_ventas:,.2f}).")
+    filtro_categoria = st.sidebar.multiselect("Filtrar por Categoría", categorias, key="filtro_categoria")
+    filtro_marca = st.sidebar.multiselect("Filtrar por Marca", marcas, key="filtro_marca")
+    filtro_nombre = st.sidebar.multiselect("Filtrar por Producto (Nombre)", nombres, key="filtro_nombre")
+
+    if st.sidebar.button("Limpiar Filtros"):
+        filtro_categoria = []
+        filtro_marca = []
+        filtro_nombre = []
+
+    datos_filtrados = datos.copy()
+    if filtro_categoria:
+        datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
+    if filtro_marca:
+        datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
+    if filtro_nombre:
+        datos_filtrados = datos_filtrados[datos_filtrados["nombre"].isin(filtro_nombre)]
+
+    # Tablas interactivas por punto de venta
+    st.subheader("Tablas Interactivas por Punto de Venta")
+    for punto in puntos_venta:
+        st.markdown(f'<div class="custom-box"><h3>{punto.title()}</h3>', unsafe_allow_html=True)
+        vendido_col = f"{punto} vendido"
+        if vendido_col in datos_filtrados.columns:
+            # Crear tabla de datos agregados ordenada por Unidades_Vendidas
+            tabla = datos_filtrados.groupby("nombre").agg(
+                Unidades_Vendidas=(vendido_col, "sum"),
+                Total_Ventas=(f"total neto", "sum"),
+                Ganancia=("ganancia", "sum"),
+            ).reset_index().sort_values("Unidades_Vendidas", ascending=False)
+            st.dataframe(tabla)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Gráficos
+    st.subheader("Gráficos de Productos Más Vendidos")
+    productos_mas_vendidos = datos_filtrados.groupby("nombre")["total neto"].sum().nlargest(5)
+
+    st.markdown("#### Top 5 Productos Más Vendidos (Totales)")
+    fig, ax = plt.subplots()
+    productos_mas_vendidos.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+    ax.set_ylabel("")
+    st.pyplot(fig)
+
+    for punto in puntos_venta:
+        st.markdown(f"#### Top 5 Productos Más Vendidos en {punto.title()}")
+        top_punto_venta = datos_filtrados.groupby("nombre")[f"{punto} vendido"].sum().nlargest(5)
+        fig, ax = plt.subplots()
+        top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
+        ax.set_ylabel("")
+        st.pyplot(fig)
+
+    # Generador de Órdenes
+    st.subheader("Generador de Órdenes")
+    punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
+    dias = st.number_input("Ingrese el número de días de ventas que desea calcular", min_value=1, max_value=30, value=7)
+
+    if punto_seleccionado:
+        vendido_col = f"{punto_seleccionado} vendido"
+        if vendido_col in datos.columns:
+            datos["unidades_diarias"] = datos[vendido_col] / 30  # Unidades promedio por día
+            datos["proyeccion_unidades"] = datos["unidades_diarias"] * dias
+
+            # Mostrar tabla de proyección
+            st.dataframe(datos[["nombre", vendido_col, "proyeccion_unidades"]])
 
 except Exception as e:
-    # Manejo de errores
     st.error(f"Error al procesar el archivo: {e}")
