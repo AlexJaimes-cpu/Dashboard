@@ -48,6 +48,16 @@ st.markdown("""
 current_dir = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(current_dir, 'Reporte_Corregido.xlsx')
 
+# Agregar botón para generar órdenes
+if st.button("Generar Orden", key="generar_orden"):
+    # Crear URL para la nueva pestaña (streamlit-provided navigation)
+    js_code = """
+    <script>
+    window.open(window.location.href + "/generar_orden", "_blank");
+    </script>
+    """
+    st.markdown(js_code, unsafe_allow_html=True)
+    
 try:
     # Leer el archivo y procesar los datos
     datos = pd.read_excel(file_path, sheet_name="Sheet1")
@@ -177,6 +187,51 @@ try:
             top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
             ax.set_ylabel("")
             st.pyplot(fig)
+# Página para gestionar órdenes
+if "generar_orden" in st.experimental_get_query_params():
+    st.title("Gestión de Órdenes")
+    
+    # Filtros de punto de venta y producto
+    st.subheader("Filtros")
+    punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
+    dias_ventas = st.number_input("Número de días de ventas a calcular", min_value=1, max_value=30, value=7)
 
+    categorias = datos["categoria"].dropna().unique().tolist() if "categoria" in datos.columns else []
+    marcas = datos["marca"].dropna().unique().tolist() if "marca" in datos.columns else []
+    filtro_categoria = st.multiselect("Filtrar por Categoría (Opcional)", categorias, key="orden_filtro_categoria")
+    filtro_marca = st.multiselect("Filtrar por Marca (Opcional)", marcas, key="orden_filtro_marca")
+
+    # Filtrar datos
+    datos_filtrados = datos.copy()
+    if filtro_categoria:
+        datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
+    if filtro_marca:
+        datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
+
+    # Calcular proyección de unidades vendidas
+    if punto_seleccionado:
+        vendido_col = f"{punto_seleccionado} vendido"
+        inventario_col = f"{punto_seleccionado} inventario"
+        if vendido_col in datos_filtrados.columns and inventario_col in datos_filtrados.columns:
+            datos_filtrados["Unidades Vendidas"] = (datos_filtrados[vendido_col] / 30) * dias_ventas
+            datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
+
+            # Editar inventario manualmente
+            inventario_modificado = st.experimental_data_editor(
+                datos_filtrados[["nombre", "Inventario"]],
+                key="editor_inventario",
+                num_rows="dynamic",
+            )
+
+            # Recalcular la columna de diferencia (orden)
+            datos_filtrados["Unidades en Orden"] = (
+                datos_filtrados["Unidades Vendidas"] - inventario_modificado["Inventario"]
+            ).clip(lower=0)
+
+            # Mostrar tabla final
+            st.subheader("Tabla de Órdenes Generadas")
+            st.dataframe(
+                datos_filtrados[["nombre", "Unidades Vendidas", "Inventario", "Unidades en Orden"]]
+            )
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}")
