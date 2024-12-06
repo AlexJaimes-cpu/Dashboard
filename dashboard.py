@@ -97,35 +97,59 @@ try:
             </div>
         """, unsafe_allow_html=True)
 
-    # Totales por punto de venta (cálculo corregido)
-    st.subheader("Totales por Punto de Venta")
-    cols = st.columns(len(puntos_venta))  # Crear columnas para mostrar los totales de cada punto de venta
+   # Totales por punto de venta (recalcular si necesario)
+st.subheader("Totales por Punto de Venta")
+cols = st.columns(len(puntos_venta))  # Crear columnas para mostrar los totales de cada punto de venta
 
+# Verificar si las columnas específicas de ventas existen
+if all(f"{punto} vendido" in datos.columns for punto in puntos_venta):
     suma_puntos_venta = 0
     for i, punto in enumerate(puntos_venta):
         vendido_col = f"{punto} vendido"
-        if vendido_col in datos.columns:
-            total_venta_punto = datos[vendido_col].sum()  # Sumar correctamente las ventas por punto de venta
-            suma_puntos_venta += total_venta_punto  # Acumular para verificar con total neto
+        total_venta_punto = datos[vendido_col].sum()  # Sumar correctamente las ventas por punto de venta
+        suma_puntos_venta += total_venta_punto
 
-            total_costo_punto = total_venta_punto * (total_costo / total_ventas) if total_ventas > 0 else 0
-            ganancia_punto = total_venta_punto - total_costo_punto
-            margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto > 0 else 0
+        total_costo_punto = total_venta_punto * (total_costo / total_ventas) if total_ventas > 0 else 0
+        ganancia_punto = total_venta_punto - total_costo_punto
+        margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto > 0 else 0
 
-            with cols[i]:
-                st.markdown(f"""
-                    <div class="custom-box">
-                        <h3>{punto.title()}</h3>
-                        <p>Total Ventas: ${total_venta_punto:,.2f}</p>
-                        <p>Total Costo: ${total_costo_punto:,.2f}</p>
-                        <p>Ganancia: ${ganancia_punto:,.2f}</p>
-                        <p>Margen: {margen_punto:.2f}%</p>
-                    </div>
-                """, unsafe_allow_html=True)
+        with cols[i]:
+            st.markdown(f"""
+                <div class="custom-box">
+                    <h3>{punto.title()}</h3>
+                    <p>Total Ventas: ${total_venta_punto:,.2f}</p>
+                    <p>Total Costo: ${total_costo_punto:,.2f}</p>
+                    <p>Ganancia: ${ganancia_punto:,.2f}</p>
+                    <p>Margen: {margen_punto:.2f}%</p>
+                </div>
+            """, unsafe_allow_html=True)
 
     # Verificar si las ventas totales por punto de venta coinciden con el total neto
     if abs(suma_puntos_venta - total_ventas) > 1e-2:  # Permitir un margen mínimo de error
         st.error(f"ERROR: Las ventas totales por punto de venta (${suma_puntos_venta:,.2f}) no coinciden con el total neto (${total_ventas:,.2f}).")
+else:
+    # Si las columnas de ventas no existen, distribuye proporcionalmente
+    st.warning("Las columnas específicas de ventas por punto de venta no existen. Distribuyendo ventas proporcionalmente.")
+    proporciones = [0.5, 0.3, 0.2]  # Ejemplo: proporción fija para cada punto de venta
+    suma_puntos_venta = 0
+    for i, punto in enumerate(puntos_venta):
+        total_venta_punto = total_ventas * proporciones[i]  # Distribuir proporcionalmente
+        suma_puntos_venta += total_venta_punto
+
+        total_costo_punto = total_venta_punto * (total_costo / total_ventas) if total_ventas > 0 else 0
+        ganancia_punto = total_venta_punto - total_costo_punto
+        margen_punto = (ganancia_punto / total_venta_punto) * 100 if total_venta_punto > 0 else 0
+
+        with cols[i]:
+            st.markdown(f"""
+                <div class="custom-box">
+                    <h3>{punto.title()}</h3>
+                    <p>Total Ventas: ${total_venta_punto:,.2f}</p>
+                    <p>Total Costo: ${total_costo_punto:,.2f}</p>
+                    <p>Ganancia: ${ganancia_punto:,.2f}</p>
+                    <p>Margen: {margen_punto:.2f}%</p>
+                </div>
+            """, unsafe_allow_html=True)
 
     # Filtros acumulativos
     st.sidebar.header("Filtros")
