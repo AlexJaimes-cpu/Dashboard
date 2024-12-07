@@ -177,6 +177,57 @@ try:
             top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
             ax.set_ylabel("")
             st.pyplot(fig)
+            
+# Botón para abrir la ventana emergente de creación de orden
+if st.button("Crear Orden de Compra"):
+    # Crear filtros
+    st.title("Crear Orden de Compra")
+    punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
+    dias_ventas = st.number_input("Días de Ventas a Mostrar", min_value=1, max_value=30, value=7)
+
+    # Filtros opcionales
+    filtro_nombre = st.multiselect("Buscar por Nombre (Acumulativo)", nombres, key="orden_filtro_nombre")
+    filtro_marca = st.multiselect("Filtrar por Marca (Opcional)", marcas, key="orden_filtro_marca")
+    filtro_categoria = st.multiselect("Filtrar por Categoría (Opcional)", categorias, key="orden_filtro_categoria")
+
+    # Filtrar datos según criterios seleccionados
+    datos_filtrados = datos.copy()
+    if filtro_nombre:
+        datos_filtrados = datos_filtrados[datos_filtrados["nombre"].isin(filtro_nombre)]
+    if filtro_marca:
+        datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
+    if filtro_categoria:
+        datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
+
+    # Calcular ventas en el rango de días
+    if punto_seleccionado:
+        vendido_col = f"{punto_seleccionado} vendido"
+        inventario_col = f"{punto_seleccionado} inventario"
+        if vendido_col in datos_filtrados.columns and inventario_col in datos_filtrados.columns:
+            datos_filtrados["Ventas en Días"] = (datos_filtrados[vendido_col] / 30) * dias_ventas
+            datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
+
+            # Permitir editar inventario manualmente
+            inventario_modificado = st.experimental_data_editor(
+                datos_filtrados[["nombre", "Inventario"]],
+                key="editor_inventario",
+                num_rows="dynamic",
+            )
+
+            # Calcular unidades a ordenar
+            datos_filtrados["Unidades a Ordenar"] = (
+                datos_filtrados["Ventas en Días"] - inventario_modificado["Inventario"]
+            ).clip(lower=0)
+
+            # Mostrar tabla final
+            st.subheader("Resumen de Orden de Compra")
+            st.dataframe(
+                datos_filtrados[["nombre", "Ventas en Días", "Inventario", "Unidades a Ordenar"]]
+            )
+
+            # Botón para confirmar la creación de la orden
+            if st.button("Confirmar Orden"):
+                st.success("Orden creada exitosamente.")
 
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}")
