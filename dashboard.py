@@ -177,7 +177,8 @@ try:
             top_punto_venta.plot(kind="pie", autopct='%1.1f%%', ax=ax, startangle=90, legend=False)
             ax.set_ylabel("")
             st.pyplot(fig)
- except Exception as e:
+
+except Exception as e:
     st.error(f"Error al procesar el archivo: {e}")
 
 # Nuevo código para crear la orden de compra
@@ -222,11 +223,3 @@ if st.button("Crear Orden de Compra"):
             ).clip(lower=0)
 
             # Mostrar tabla final
-            st.subheader("Resumen de Orden de Compra")
-            st.dataframe(
-                datos_filtrados[["nombre", "Ventas en Días", "Inventario", "Unidades a Ordenar"]]
-            )
-
-            # Botón para confirmar la creación de la orden
-            if st.button("Confirmar Orden"):
-                st.success("Orden creada exitosamente.")
