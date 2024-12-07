@@ -178,17 +178,5 @@ try:
             ax.set_ylabel("")
             st.pyplot(fig)
 
-    # Nueva funcionalidad para gestionar órdenes
-    if st.button("Generar Orden", key="generar_orden"):
-        js_code = """
-        <script>
-        window.open(window.location.href + "/generar_orden", "_blank");
-        </script>
-        """
-        st.markdown(js_code, unsafe_allow_html=True)
-
-    # Página de generación de órdenes
-    if "generar_orden" in st.experimental_get_query_params():
-        st.title("Gestión de Órdenes")
-        
-        # Filtros de punto de venta
+except Exception as e:
+    st.error(f"Error al procesar el archivo: {e}")
