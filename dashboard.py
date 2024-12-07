@@ -180,6 +180,7 @@ try:
 
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}") 
+
 # Crear sección para "Crear Orden de Compra"
 st.subheader("Crear Orden de Compra")
 
@@ -208,24 +209,25 @@ if punto_seleccionado:
     vendido_col = f"{punto_seleccionado} vendido"
     inventario_col = f"{punto_seleccionado} inventario"
     if vendido_col in datos_filtrados.columns and inventario_col in datos_filtrados.columns:
-        # Calcular ventas en el rango de días y agregar columnas necesarias
+        # Calcular unidades vendidas en el rango de días
         datos_filtrados["Unidades Vendidas en Días"] = (datos_filtrados[vendido_col] / 30) * dias_ventas
-        datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
 
-# Editar inventario manualmente con `st.number_input`
-datos_filtrados["Inventario Editado"] = datos_filtrados.apply(
-    lambda row: st.number_input(
-        f"Inventario para {row['nombre']}",
-        value=row[f"{punto_seleccionado} inventario"]
-    ),
-    axis=1
-)
+        # Editar manualmente el inventario usando `st.number_input`
+        datos_filtrados["Inventario Editado"] = datos_filtrados.apply(
+            lambda row: st.number_input(
+                f"Inventario para {row['nombre']}",
+                value=row[inventario_col]
+            ),
+            axis=1
+        )
 
-# Calcular las unidades a ordenar
-datos_filtrados["Unidades a Comprar"] = (
-    datos_filtrados["Unidades Vendidas en Días"] - datos_filtrados["Inventario Editado"]
-).clip(lower=0)
+        # Calcular unidades a comprar
+        datos_filtrados["Unidades a Comprar"] = (
+            datos_filtrados["Inventario Editado"] - datos_filtrados["Unidades Vendidas en Días"]
+        ).clip(lower=0)
 
-# Mostrar la tabla final
-st.subheader("Resumen de Orden de Compra")
-st.dataframe(datos_filtrados[["nombre", "Unidades Vendidas en Días", "Inventario Editado", "Unidades a Comprar"]])
+        # Mostrar la tabla final
+        st.subheader("Resumen de Orden de Compra")
+        st.dataframe(
+            datos_filtrados[["nombre", "Unidades Vendidas en Días", "Inventario Editado", "Unidades a Comprar"]]
+        )
