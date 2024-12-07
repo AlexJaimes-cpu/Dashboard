@@ -211,10 +211,13 @@ if punto_seleccionado:
         # Calcular ventas en el rango de días y agregar columnas necesarias
         datos_filtrados["Unidades Vendidas en Días"] = (datos_filtrados[vendido_col] / 30) * dias_ventas
         datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
-        
+
 # Editar inventario manualmente con `st.number_input`
 datos_filtrados["Inventario Editado"] = datos_filtrados.apply(
-    lambda row: st.number_input(f"Inventario para {row['nombre']}", value=row[f"{punto_seleccionado} inventario"]),
+    lambda row: st.number_input(
+        f"Inventario para {row['nombre']}",
+        value=row[f"{punto_seleccionado} inventario"]
+    ),
     axis=1
 )
 
@@ -226,15 +229,3 @@ datos_filtrados["Unidades a Comprar"] = (
 # Mostrar la tabla final
 st.subheader("Resumen de Orden de Compra")
 st.dataframe(datos_filtrados[["nombre", "Unidades Vendidas en Días", "Inventario Editado", "Unidades a Comprar"]])
-
-
-        # Calcular las unidades a ordenar
-        datos_filtrados["Unidades a Comprar"] = (
-            datos_filtrados["Unidades Vendidas en Días"] - inventario_modificado["Inventario"]
-        ).clip(lower=0)
-
-        # Mostrar la tabla final
-        st.subheader("Resumen de Orden de Compra")
-        st.dataframe(
-            datos_filtrados[["nombre", "Unidades Vendidas en Días", "Inventario", "Unidades a Comprar"]]
-        )
