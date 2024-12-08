@@ -230,10 +230,18 @@ if not datos_filtrados.empty and punto_seleccionado:
             datos_filtrados["Inventario Editado"] - datos_filtrados["Unidades Vendidas en Días"]
         ).clip(lower=0)
 
-        # Mostrar la tabla final solo con productos filtrados
+        # Mostrar tabla final con diseño ajustado
         st.subheader("Resumen de Orden de Compra")
-        st.dataframe(
+        st.write(f"**Punto de Venta:** {punto_seleccionado}")
+        st.write(f"**Días de Ventas:** {dias_ventas}")
+        st.table(
             datos_filtrados[["nombre", "Unidades Vendidas en Días", "Inventario Editado", "Unidades a Comprar"]]
+            .rename(columns={
+                "nombre": "Nombre",
+                "Unidades Vendidas en Días": f"Ventas en {dias_ventas} días",
+                "Inventario Editado": "Inventario",
+                "Unidades a Comprar": "Und. x Comprar"
+            })
         )
 else:
     st.warning("Por favor, seleccione filtros para mostrar los resultados.")
