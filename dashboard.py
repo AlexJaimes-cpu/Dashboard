@@ -181,6 +181,8 @@ try:
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}") 
 
+import math
+
 # Crear sección para "Crear Orden de Compra"
 st.subheader("Crear Orden de Compra")
 
@@ -212,34 +214,41 @@ if not datos_filtrados.empty and punto_seleccionado:
     inventario_col = f"{punto_seleccionado} inventario"
 
     if vendido_col in datos_filtrados.columns and inventario_col in datos_filtrados.columns:
-        # Calcular unidades vendidas en el rango de días
-        datos_filtrados["Unidades Vendidas en Días"] = (datos_filtrados[vendido_col] / 30) * dias_ventas
-
-        # Editar manualmente el inventario usando `st.number_input`
-        datos_filtrados["Inventario Editado"] = datos_filtrados.apply(
-            lambda row: st.number_input(
-                f"Inventario para {row['nombre']}",
-                value=row[inventario_col],
-                key=f"inv_{row['nombre']}"
-            ),
-            axis=1
+        # Calcular unidades vendidas en el rango de días (redondeo hacia arriba)
+        datos_filtrados["Unidades Vendidas en Días"] = datos_filtrados[vendido_col].apply(
+            lambda x: math.ceil((x / 30) * dias_ventas)
         )
 
-        # Calcular unidades a comprar
+        # Crear una copia de la columna inventario para edición
+        datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
+
+        # Permitir edición manual del inventario directamente en la tabla
+        for index, row in datos_filtrados.iterrows():
+            datos_filtrados.at[index, "Inventario"] = st.number_input(
+                f"Inventario para {row['nombre']}",
+                value=row["Inventario"],
+                key=f"inv_{row['nombre']}"
+            )
+
+        # Calcular unidades a comprar después de la edición
         datos_filtrados["Unidades a Comprar"] = (
-            datos_filtrados["Inventario Editado"] - datos_filtrados["Unidades Vendidas en Días"]
-        ).clip(lower=0)
+            datos_filtrados["Inventario"] - datos_filtrados["Unidades Vendidas en Días"]
+        ).clip(lower=0).apply(math.ceil)
 
         # Mostrar tabla final con diseño ajustado
         st.subheader("Resumen de Orden de Compra")
         st.write(f"**Punto de Venta:** {punto_seleccionado}")
         st.write(f"**Días de Ventas:** {dias_ventas}")
         st.table(
-            datos_filtrados[["nombre", "Unidades Vendidas en Días", "Inventario Editado", "Unidades a Comprar"]]
-            .rename(columns={
+            datos_filtrados[[
+                "nombre",
+                "Unidades Vendidas en Días",
+                "Inventario",
+                "Unidades a Comprar"
+            ]].rename(columns={
                 "nombre": "Nombre",
                 "Unidades Vendidas en Días": f"Ventas en {dias_ventas} días",
-                "Inventario Editado": "Inventario",
+                "Inventario": "Inventario",
                 "Unidades a Comprar": "Und. x Comprar"
             })
         )
