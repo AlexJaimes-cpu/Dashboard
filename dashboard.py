@@ -227,7 +227,7 @@ if not datos_filtrados.empty and punto_seleccionado:
             datos_filtrados.at[index, "Inventario"] = st.number_input(
                 f"Inventario para {row['nombre']}",
                 value=row["Inventario"],
-                key=f"inv_{row['nombre']}"
+                key=f"inv_{row['nombre']}_{index}"  # Clave única con índice
             )
 
         # Calcular unidades a comprar después de la edición
