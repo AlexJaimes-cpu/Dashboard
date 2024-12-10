@@ -181,8 +181,6 @@ try:
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}") 
 
-import math
-
 # Crear sección para "Crear Orden de Compra"
 st.subheader("Crear Orden de Compra")
 
@@ -222,20 +220,28 @@ if not datos_filtrados.empty and punto_seleccionado:
         # Crear una copia de la columna inventario para edición
         datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
 
-        # Permitir edición manual del inventario directamente en la tabla
+        # Editar inventario y calcular "Unidades a Comprar"
+        inventario_editado = []
+        unidades_a_comprar_editado = []
+
         for index, row in datos_filtrados.iterrows():
-            datos_filtrados.at[index, "Inventario"] = st.number_input(
+            # Editar inventario directamente en la tabla
+            inventario = st.number_input(
                 f"Inventario para {row['nombre']}",
                 value=row["Inventario"],
-                key=f"inv_{row['nombre']}_{index}"  # Clave única con índice
+                key=f"inv_{row['nombre']}_{index}"
             )
+            inventario_editado.append(inventario)
 
-        # Calcular unidades a comprar después de la edición
-        datos_filtrados["Unidades a Comprar"] = (
-            datos_filtrados["Inventario"] - datos_filtrados["Unidades Vendidas en Días"]
-        ).clip(lower=0).apply(math.ceil)
+            # Calcular unidades a comprar: inventario - unidades vendidas
+            unidades_a_comprar = max(0, row["Unidades Vendidas en Días"] - inventario)
+            unidades_a_comprar_editado.append(unidades_a_comprar)
 
-        # Mostrar tabla final con diseño ajustado
+        # Actualizar los valores en el DataFrame
+        datos_filtrados["Inventario"] = inventario_editado
+        datos_filtrados["Unidades a Comprar"] = unidades_a_comprar_editado
+
+        # Mostrar tabla final
         st.subheader("Resumen de Orden de Compra")
         st.write(f"**Punto de Venta:** {punto_seleccionado}")
         st.write(f"**Días de Ventas:** {dias_ventas}")
