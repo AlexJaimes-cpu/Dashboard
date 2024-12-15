@@ -181,6 +181,8 @@ try:
 except Exception as e:
     st.error(f"Error al procesar el archivo: {e}") 
 
+import math
+
 # Crear sección para "Crear Orden de Compra"
 st.subheader("Crear Orden de Compra")
 
@@ -211,52 +213,44 @@ if not datos_filtrados.empty and punto_seleccionado:
     vendido_col = f"{punto_seleccionado} vendido"
     inventario_col = f"{punto_seleccionado} inventario"
 
+    # Validar que las columnas necesarias existan en los datos filtrados
     if vendido_col in datos_filtrados.columns and inventario_col in datos_filtrados.columns:
+        # Rellenar valores faltantes con 0
+        datos_filtrados[vendido_col] = datos_filtrados[vendido_col].fillna(0)
+        datos_filtrados[inventario_col] = datos_filtrados[inventario_col].fillna(0)
+
         # Calcular unidades vendidas en el rango de días (redondeo hacia arriba)
         datos_filtrados["Unidades Vendidas en Días"] = datos_filtrados[vendido_col].apply(
             lambda x: math.ceil((x / 30) * dias_ventas)
         )
 
-        # Crear una copia de la columna inventario para edición
-        datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
+        # Crear columnas para edición
+        datos_filtrados["Inventario Editable"] = datos_filtrados[inventario_col]
+        datos_filtrados["Unidades a Comprar Editable"] = datos_filtrados.apply(
+            lambda row: max(0, row["Inventario Editable"] - row["Unidades Vendidas en Días"]), axis=1
+        )
 
-        # Editar inventario y calcular "Unidades a Comprar"
-        inventario_editado = []
-        unidades_a_comprar_editado = []
-
-        for index, row in datos_filtrados.iterrows():
-            # Editar inventario directamente en la tabla
-            inventario = st.number_input(
-                f"Inventario para {row['nombre']}",
-                value=row["Inventario"],
-                key=f"inv_{row['nombre']}_{index}"
-            )
-            inventario_editado.append(inventario)
-
-            # Calcular unidades a comprar: inventario - unidades vendidas
-            unidades_a_comprar = max(0, row["Unidades Vendidas en Días"] - inventario)
-            unidades_a_comprar_editado.append(unidades_a_comprar)
-
-        # Actualizar los valores en el DataFrame
-        datos_filtrados["Inventario"] = inventario_editado
-        datos_filtrados["Unidades a Comprar"] = unidades_a_comprar_editado
-
-        # Mostrar tabla final
-        st.subheader("Resumen de Orden de Compra")
-        st.write(f"**Punto de Venta:** {punto_seleccionado}")
-        st.write(f"**Días de Ventas:** {dias_ventas}")
-        st.table(
+        # Edición directa desde la tabla
+        datos_editables = st.experimental_data_editor(
             datos_filtrados[[
                 "nombre",
                 "Unidades Vendidas en Días",
-                "Inventario",
-                "Unidades a Comprar"
+                "Inventario Editable",
+                "Unidades a Comprar Editable"
             ]].rename(columns={
                 "nombre": "Nombre",
                 "Unidades Vendidas en Días": f"Ventas en {dias_ventas} días",
-                "Inventario": "Inventario",
-                "Unidades a Comprar": "Und. x Comprar"
-            })
+                "Inventario Editable": "Inventario",
+                "Unidades a Comprar Editable": "Und. x Comprar"
+            }),
+            key="tabla_orden_compra",
+            num_rows="dynamic"
         )
+
+        # Mostrar tabla actualizada
+        st.subheader("Resumen de Orden de Compra")
+        st.table(datos_editables)
+    else:
+        st.warning("No se encontraron las columnas necesarias para este punto de venta.")
 else:
     st.warning("Por favor, seleccione filtros para mostrar los resultados.")
