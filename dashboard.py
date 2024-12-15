@@ -183,13 +183,13 @@ except Exception as e:
 
 import math
 
-# Crear sección para "Crear Orden de Compra"
+# Título para la sección de la orden de compra
 st.subheader("Crear Orden de Compra")
 
-# Filtro de punto de venta
+# Filtro del punto de venta
 punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
 
-# Filtro de días de ventas
+# Número de días de ventas a mostrar
 dias_ventas = st.number_input("Días de Ventas a Mostrar", min_value=1, max_value=30, value=7)
 
 # Filtros adicionales opcionales
@@ -197,60 +197,59 @@ filtro_nombre = st.multiselect("Buscar por Nombre (Acumulativo)", nombres, key="
 filtro_marca = st.multiselect("Filtrar por Marca (Opcional)", marcas, key="orden_filtro_marca")
 filtro_categoria = st.multiselect("Filtrar por Categoría (Opcional)", categorias, key="orden_filtro_categoria")
 
-# Filtrar los datos según los criterios seleccionados
-datos_filtrados = datos.copy()
-
-# Aplicar filtros solo si se selecciona algo
-if filtro_nombre:
-    datos_filtrados = datos_filtrados[datos_filtrados["nombre"].isin(filtro_nombre)]
-if filtro_marca:
-    datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
-if filtro_categoria:
-    datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
-
-# Verificar si hay resultados tras aplicar los filtros
-if not datos_filtrados.empty and punto_seleccionado:
+# Verificar si hay datos y un punto seleccionado
+if punto_seleccionado:
     vendido_col = f"{punto_seleccionado} vendido"
     inventario_col = f"{punto_seleccionado} inventario"
 
-    # Validar que las columnas necesarias existan en los datos filtrados
-    if vendido_col in datos_filtrados.columns and inventario_col in datos_filtrados.columns:
-        # Rellenar valores faltantes con 0
+    # Filtrar los datos
+    datos_filtrados = datos.copy()
+
+    if filtro_nombre:
+        datos_filtrados = datos_filtrados[datos_filtrados["nombre"].isin(filtro_nombre)]
+    if filtro_marca:
+        datos_filtrados = datos_filtrados[datos_filtrados["marca"].isin(filtro_marca)]
+    if filtro_categoria:
+        datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
+
+    if not datos_filtrados.empty and vendido_col in datos.columns and inventario_col in datos.columns:
+        # Rellenar nulos
         datos_filtrados[vendido_col] = datos_filtrados[vendido_col].fillna(0)
         datos_filtrados[inventario_col] = datos_filtrados[inventario_col].fillna(0)
 
-        # Calcular unidades vendidas en el rango de días (redondeo hacia arriba)
+        # Cálculo de ventas por días y unidades a comprar
         datos_filtrados["Unidades Vendidas en Días"] = datos_filtrados[vendido_col].apply(
             lambda x: math.ceil((x / 30) * dias_ventas)
         )
-
-        # Crear columnas para edición
-        datos_filtrados["Inventario Editable"] = datos_filtrados[inventario_col]
-        datos_filtrados["Unidades a Comprar Editable"] = datos_filtrados.apply(
-            lambda row: max(0, row["Inventario Editable"] - row["Unidades Vendidas en Días"]), axis=1
+        datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
+        datos_filtrados["Unidades a Comprar"] = datos_filtrados.apply(
+            lambda row: max(0, row["Unidades Vendidas en Días"] - row["Inventario"]), axis=1
         )
 
-        # Edición directa desde la tabla
-        datos_editables = st.experimental_data_editor(
+        # Crear tabla editable para Inventario y Unidades a Comprar
+        st.markdown("### Resumen de Orden de Compra")
+        st.markdown(f"**Punto de Venta:** {punto_seleccionado}")
+        st.markdown(f"**Días de Ventas:** {dias_ventas}")
+
+        datos_editables = st.data_editor(
             datos_filtrados[[
                 "nombre",
                 "Unidades Vendidas en Días",
-                "Inventario Editable",
-                "Unidades a Comprar Editable"
+                "Inventario",
+                "Unidades a Comprar"
             ]].rename(columns={
                 "nombre": "Nombre",
                 "Unidades Vendidas en Días": f"Ventas en {dias_ventas} días",
-                "Inventario Editable": "Inventario",
-                "Unidades a Comprar Editable": "Und. x Comprar"
+                "Inventario": "Inventario",
+                "Unidades a Comprar": "Und. x Comprar"
             }),
-            key="tabla_orden_compra",
-            num_rows="dynamic"
+            key="editor_orden_compra"
         )
 
-        # Mostrar tabla actualizada
-        st.subheader("Resumen de Orden de Compra")
-        st.table(datos_editables)
+        # Mostrar la tabla actualizada
+        st.dataframe(datos_editables)
+
     else:
-        st.warning("No se encontraron las columnas necesarias para este punto de venta.")
+        st.warning("No hay datos disponibles para el punto de venta seleccionado y los filtros aplicados.")
 else:
-    st.warning("Por favor, seleccione filtros para mostrar los resultados.")
+    st.warning("Por favor seleccione un punto de venta.")
