@@ -187,15 +187,15 @@ import math
 st.subheader("Crear Orden de Compra")
 
 # Filtro del punto de venta
-punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta)
+punto_seleccionado = st.selectbox("Seleccione un Punto de Venta", puntos_venta, index=None)
 
 # Número de días de ventas a mostrar
 dias_ventas = st.number_input("Días de Ventas a Mostrar", min_value=1, max_value=30, value=7)
 
 # Filtros adicionales opcionales
-filtro_nombre = st.multiselect("Buscar por Nombre (Acumulativo)", nombres, key="orden_filtro_nombre")
-filtro_marca = st.multiselect("Filtrar por Marca (Opcional)", marcas, key="orden_filtro_marca")
-filtro_categoria = st.multiselect("Filtrar por Categoría (Opcional)", categorias, key="orden_filtro_categoria")
+filtro_nombre = st.multiselect("Buscar por Nombre (Acumulativo)", nombres, default=None, key="orden_filtro_nombre")
+filtro_marca = st.multiselect("Filtrar por Marca (Opcional)", marcas, default=None, key="orden_filtro_marca")
+filtro_categoria = st.multiselect("Filtrar por Categoría (Opcional)", categorias, default=None, key="orden_filtro_categoria")
 
 # Inicializar la tabla vacía por defecto
 tabla_resumen = pd.DataFrame(columns=["Nombre", f"Ventas en {dias_ventas} días", "Inventario", "Und. x Comprar"])
@@ -255,7 +255,7 @@ if punto_seleccionado:
             lambda row: max(0, row[f"Ventas en {dias_ventas} días"] - row["Inventario"]), axis=1
         )
 
-        # Mostrar tabla actualizada
+        # Mostrar tabla actualizada sin duplicados
         st.dataframe(datos_editables)
     else:
         st.info("No hay datos para mostrar. Ajuste los filtros.")
