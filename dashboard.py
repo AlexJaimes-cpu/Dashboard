@@ -197,6 +197,9 @@ filtro_nombre = st.multiselect("Buscar por Nombre (Acumulativo)", nombres, key="
 filtro_marca = st.multiselect("Filtrar por Marca (Opcional)", marcas, key="orden_filtro_marca")
 filtro_categoria = st.multiselect("Filtrar por Categoría (Opcional)", categorias, key="orden_filtro_categoria")
 
+# Inicializar la tabla vacía por defecto
+tabla_resumen = pd.DataFrame(columns=["Nombre", f"Ventas en {dias_ventas} días", "Inventario", "Und. x Comprar"])
+
 # Verificar si hay datos y un punto seleccionado
 if punto_seleccionado:
     vendido_col = f"{punto_seleccionado} vendido"
@@ -204,7 +207,6 @@ if punto_seleccionado:
 
     # Filtrar los datos
     datos_filtrados = datos.copy()
-
     if filtro_nombre:
         datos_filtrados = datos_filtrados[datos_filtrados["nombre"].isin(filtro_nombre)]
     if filtro_marca:
@@ -212,44 +214,50 @@ if punto_seleccionado:
     if filtro_categoria:
         datos_filtrados = datos_filtrados[datos_filtrados["categoria"].isin(filtro_categoria)]
 
+    # Calcular solo si hay datos filtrados y columnas relevantes
     if not datos_filtrados.empty and vendido_col in datos.columns and inventario_col in datos.columns:
         # Rellenar nulos
         datos_filtrados[vendido_col] = datos_filtrados[vendido_col].fillna(0)
         datos_filtrados[inventario_col] = datos_filtrados[inventario_col].fillna(0)
 
-        # Cálculo de ventas por días y unidades a comprar
-        datos_filtrados["Unidades Vendidas en Días"] = datos_filtrados[vendido_col].apply(
+        # Cálculo de unidades vendidas en días y unidades a comprar
+        datos_filtrados["Ventas en Días"] = datos_filtrados[vendido_col].apply(
             lambda x: math.ceil((x / 30) * dias_ventas)
         )
         datos_filtrados["Inventario"] = datos_filtrados[inventario_col]
         datos_filtrados["Unidades a Comprar"] = datos_filtrados.apply(
-            lambda row: max(0, row["Unidades Vendidas en Días"] - row["Inventario"]), axis=1
+            lambda row: max(0, row["Ventas en Días"] - row["Inventario"]), axis=1
         )
 
-        # Crear tabla editable para Inventario y Unidades a Comprar
+        # Crear tabla editable para Inventario
         st.markdown("### Resumen de Orden de Compra")
         st.markdown(f"**Punto de Venta:** {punto_seleccionado}")
         st.markdown(f"**Días de Ventas:** {dias_ventas}")
 
+        # Tabla editable
         datos_editables = st.data_editor(
             datos_filtrados[[
                 "nombre",
-                "Unidades Vendidas en Días",
+                "Ventas en Días",
                 "Inventario",
                 "Unidades a Comprar"
             ]].rename(columns={
                 "nombre": "Nombre",
-                "Unidades Vendidas en Días": f"Ventas en {dias_ventas} días",
+                "Ventas en Días": f"Ventas en {dias_ventas} días",
                 "Inventario": "Inventario",
                 "Unidades a Comprar": "Und. x Comprar"
             }),
             key="editor_orden_compra"
         )
 
-        # Mostrar la tabla actualizada
-        st.dataframe(datos_editables)
+        # Recalcular unidades a comprar si se edita el inventario
+        datos_editables["Und. x Comprar"] = datos_editables.apply(
+            lambda row: max(0, row[f"Ventas en {dias_ventas} días"] - row["Inventario"]), axis=1
+        )
 
+        # Mostrar tabla actualizada
+        st.dataframe(datos_editables)
     else:
-        st.warning("No hay datos disponibles para el punto de venta seleccionado y los filtros aplicados.")
+        st.info("No hay datos para mostrar. Ajuste los filtros.")
 else:
     st.warning("Por favor seleccione un punto de venta.")
